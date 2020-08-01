@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 
+// eslint-disable-next-line func-names
 module.exports = function (req, res, next) {
   // Get token from header
   const token = req.header('x-auth-token');
