@@ -10,6 +10,9 @@ dotenv.config({ path: './config/config.env' });
 // Connect to database
 connectDB();
 
+// Init Middleware
+app.use(express.json({ extended: false }));
+
 app.get('/', (req, res) => res.send('API Running'));
 
 // Define Routes
