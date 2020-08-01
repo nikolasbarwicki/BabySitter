@@ -15,8 +15,8 @@
     ]
   },
   "scripts": {
-    "start": "node server",
-    "server": "nodemon server"
+    "start": "NODE_ENV=production node server",
+    "dev": "nodemon server"
   },
   "author": "Nikolas Barwicki",
   "license": "MIT",
