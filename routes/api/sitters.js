@@ -30,7 +30,7 @@ router.get('/me', auth, async (req, res) => {
 });
 
 // @route   POST api/sitters/
-// @desc    Create or update sitter profile
+// @desc    Create sitter profile
 // @access  Private
 router.post(
   '/',
@@ -142,6 +142,108 @@ router.post(
   },
 );
 
+// @route   PUT api/sitters/:id
+// @desc    Update sitter profile
+// @access  Private
+router.put(
+  '/',
+  [
+    auth,
+    [
+      check('address', 'Address is required').not().isEmpty(),
+      check('dateOfBirth', 'Date of birth is required').not().isEmpty(),
+      check('description', 'Description is required').not().isEmpty(),
+      check('experience', 'Valid experience is required').isIn([
+        '<1 year',
+        '1-2 years',
+        '2-5 years',
+        '>5 years',
+      ]),
+      check('hourlyRate', 'Hourly rate is required').not().isEmpty(),
+      check('contactPhone', 'Valid phone number is required').isMobilePhone(),
+      check('contactEmail', 'Valid email address is required').isEmail(),
+    ],
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const {
+      address,
+      dateOfBirth,
+      description,
+      experience,
+      baby,
+      toddler,
+      preschooler,
+      gradeschooler,
+      teenager,
+      hourlyRate,
+      crafting,
+      drawing,
+      reading,
+      music,
+      language,
+      games,
+      pets,
+      cooking,
+      chores,
+      contactPhone,
+      contactEmail,
+    } = req.body;
+
+    // Build sitter object
+    const sitterFields = {};
+    sitterFields.user = req.user.id;
+    if (address) sitterFields.address = address;
+    if (dateOfBirth) sitterFields.dateOfBirth = dateOfBirth;
+    if (description) sitterFields.description = description;
+    if (experience) sitterFields.experience = experience;
+    if (hourlyRate) sitterFields.hourlyRate = hourlyRate;
+    if (contactPhone) sitterFields.contactPhone = contactPhone;
+    if (contactEmail) sitterFields.contactEmail = contactEmail;
+
+    // Build experienceAge object
+    sitterFields.experienceAges = {};
+    if (baby) sitterFields.experienceAges.baby = baby;
+    if (toddler) sitterFields.experienceAges.toddler = toddler;
+    if (preschooler) sitterFields.experienceAges.preschooler = preschooler;
+    if (gradeschooler)
+      sitterFields.experienceAges.gradeschooler = gradeschooler;
+    if (teenager) sitterFields.experienceAges.teenager = teenager;
+
+    // Build skills object
+    sitterFields.skills = {};
+    if (crafting) sitterFields.skills.crafting = crafting;
+    if (drawing) sitterFields.skills.drawing = drawing;
+    if (reading) sitterFields.skills.reading = reading;
+    if (music) sitterFields.skills.music = music;
+    if (language) sitterFields.skills.language = language;
+    if (games) sitterFields.skills.games = games;
+
+    // Build comfortableWith object
+    sitterFields.comfortableWith = {};
+    if (pets) sitterFields.comfortableWith.pets = pets;
+    if (cooking) sitterFields.comfortableWith.cooking = cooking;
+    if (chores) sitterFields.comfortableWith.chores = chores;
+
+    try {
+      const sitter = await Sitter.findOneAndUpdate(
+        { user: req.user.id },
+        { $set: sitterFields },
+        { new: true, useFindAndModify: false },
+      );
+
+      res.status(200).json(sitter);
+    } catch (err) {
+      console.error(err.message);
+      res.status(500).send('Server Error');
+    }
+  },
+);
+
 // @route   GET api/sitters
 // @desc    Get all sitters profiles
 // @access  Public
@@ -149,8 +251,17 @@ router.get('/', async (req, res) => {
   try {
     let query;
 
+    // Copy req.query
+    const reqQuery = { ...req.query };
+
+    // Fields to exclude
+    const removeFields = ['select', 'sort', 'page', 'limit'];
+
+    // Loop over removeFields and delete them from reqQuery
+    removeFields.forEach((param) => delete reqQuery[param]);
+
     // Create query string
-    let queryStr = JSON.stringify(req.query);
+    let queryStr = JSON.stringify(reqQuery);
 
     // Create operators ($gt, $gte, etc)
     queryStr = queryStr.replace(
@@ -158,15 +269,59 @@ router.get('/', async (req, res) => {
       (match) => `$${match}`,
     );
 
-    query = Sitter.find(JSON.parse(queryStr));
+    // Finding resource
+    query = Sitter.find(JSON.parse(queryStr)).populate('user', [
+      'name',
+      'email',
+    ]);
 
+    // Select Fields
+    if (req.query.select) {
+      const fields = req.query.select.split(',').join(' ');
+      query = query.select(fields);
+    }
+
+    // Sort
+    if (req.query.sort) {
+      const sortBy = req.query.sort.split(',').join(' ');
+      query = query.sort(sortBy);
+    } else {
+      query = query.sort('-createdAt');
+    }
+
+    // Pagination
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 5;
+    const startIndex = (page - 1) * limit;
+    const endIndex = page * limit;
+    const total = await Sitter.countDocuments();
+
+    query = query.skip(startIndex).limit(limit);
+
+    // Executing query
     const sitters = await query;
 
-    console.log(queryStr);
+    // Pagination result
+    const pagination = {};
+
+    if (endIndex < total) {
+      pagination.next = {
+        page: page + 1,
+        limit,
+      };
+    }
+
+    if (startIndex > 0) {
+      pagination.prev = {
+        page: page - 1,
+        limit,
+      };
+    }
 
     res.status(200).json({
       success: true,
       count: sitters.length,
+      pagination,
       data: sitters,
     });
   } catch (err) {

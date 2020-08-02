@@ -45,7 +45,7 @@ const SitterSchema = new mongoose.Schema({
     teenager: { type: Boolean, default: false },
   },
   hourlyRate: {
-    type: String,
+    type: Number,
     required: true,
   },
   skills: {
