@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 
-// eslint-disable-next-line func-names
-module.exports = function (req, res, next) {
+// Protect routes
+exports.protect = (req, res, next) => {
   // Get token from header
   const token = req.header('x-auth-token');
 
@@ -19,4 +19,16 @@ module.exports = function (req, res, next) {
   } catch (err) {
     res.status(401).json({ msg: 'Token is not valid' });
   }
+};
+
+// Grant access to specifioc roles
+exports.authorize = (...roles) => {
+  return (req, res, next) => {
+    if (!roles.includes(req.user.role)) {
+      return res.status(403).json({
+        msg: `User role ${req.user.role} is not authorized to access this route`,
+      });
+    }
+    next();
+  };
 };

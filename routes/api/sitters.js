@@ -2,7 +2,7 @@ const express = require('express');
 
 const router = express.Router();
 const { check, validationResult } = require('express-validator');
-const auth = require('../../middleware/auth');
+const { protect, authorize } = require('../../middleware/auth');
 const geocoder = require('../../utils/geocoder');
 
 const Sitter = require('../../models/Sitter');
@@ -10,24 +10,28 @@ const Sitter = require('../../models/Sitter');
 // @route   GET api/sitters/me
 // @desc    Get logged in sitter profile
 // @access  Private
-router.get('/me', auth, async (req, res) => {
-  try {
-    const sitter = await Sitter.findOne({
-      user: req.user.id,
-    }).populate('user', ['name', 'email']);
+router.get(
+  '/me',
+  [[protect, authorize('sitter')], authorize('sitter')],
+  async (req, res) => {
+    try {
+      const sitter = await Sitter.findOne({
+        user: req.user.id,
+      }).populate('user', ['name', 'email']);
 
-    if (!sitter) {
-      return res
-        .status(400)
-        .json({ msg: 'There is no sitter profile info for this user' });
+      if (!sitter) {
+        return res
+          .status(400)
+          .json({ msg: 'There is no sitter profile info for this user' });
+      }
+
+      res.json(sitter);
+    } catch (err) {
+      console.error(err.message);
+      res.status(500).send('Server Error');
     }
-
-    res.json(sitter);
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server Error');
-  }
-});
+  },
+);
 
 // @route   POST api/sitters/
 // @desc    Create sitter profile
@@ -35,7 +39,7 @@ router.get('/me', auth, async (req, res) => {
 router.post(
   '/',
   [
-    auth,
+    [[protect, authorize('sitter')], authorize('sitter')],
     [
       check('address', 'Address is required').not().isEmpty(),
       check('dateOfBirth', 'Date of birth is required').not().isEmpty(),
@@ -148,7 +152,7 @@ router.post(
 router.put(
   '/',
   [
-    auth,
+    [[protect, authorize('sitter')], authorize('sitter')],
     [
       check('address', 'Address is required').not().isEmpty(),
       check('dateOfBirth', 'Date of birth is required').not().isEmpty(),
@@ -356,7 +360,7 @@ router.get('/user/:user_id', async (req, res) => {
 // @route   DELETE api/sitters/user
 // @desc    Delete sitter profile
 // @access  Private
-router.delete('/user', auth, async (req, res) => {
+router.delete('/user', [protect, authorize('sitter')], async (req, res) => {
   try {
     // Remove sitter profile
     await Sitter.findOneAndRemove(

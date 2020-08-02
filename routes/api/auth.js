@@ -4,14 +4,14 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { check, validationResult } = require('express-validator');
-const auth = require('../../middleware/auth');
+const { protect } = require('../../middleware/auth');
 
 const User = require('../../models/User');
 
 // @route   GET api/auth
 // @desc    Test route
 // @access  Public
-router.get('/', auth, async (req, res) => {
+router.get('/', protect, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
     res.json(user);
@@ -60,6 +60,7 @@ router.post(
       const payload = {
         user: {
           id: user.id,
+          role: user.role,
         },
       };
 
