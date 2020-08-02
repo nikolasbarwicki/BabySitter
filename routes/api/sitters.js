@@ -146,6 +146,123 @@ router.post(
   },
 );
 
+// @route   PUT api/sitters/
+// @desc    Update sitter profile
+// @access  Private
+router.put(
+  '/:id',
+  [
+    [[protect, authorize('sitter')], authorize('sitter')],
+    [
+      check('address', 'Address is required').not().isEmpty(),
+      check('dateOfBirth', 'Date of birth is required').not().isEmpty(),
+      check('description', 'Description is required').not().isEmpty(),
+      check('experience', 'Valid experience is required').isIn([
+        '<1 year',
+        '1-2 years',
+        '2-5 years',
+        '>5 years',
+      ]),
+      check('hourlyRate', 'Hourly rate is required').not().isEmpty(),
+      check('contactPhone', 'Valid phone number is required').isMobilePhone(),
+      check('contactEmail', 'Valid email address is required').isEmail(),
+    ],
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const {
+      address,
+      dateOfBirth,
+      description,
+      experience,
+      baby,
+      toddler,
+      preschooler,
+      gradeschooler,
+      teenager,
+      hourlyRate,
+      crafting,
+      drawing,
+      reading,
+      music,
+      language,
+      games,
+      pets,
+      cooking,
+      chores,
+      contactPhone,
+      contactEmail,
+    } = req.body;
+
+    // Build sitter object
+    const sitterFields = {};
+    sitterFields.user = req.user.id;
+    if (address) sitterFields.address = address;
+    if (dateOfBirth) sitterFields.dateOfBirth = dateOfBirth;
+    if (description) sitterFields.description = description;
+    if (experience) sitterFields.experience = experience;
+    if (hourlyRate) sitterFields.hourlyRate = hourlyRate;
+    if (contactPhone) sitterFields.contactPhone = contactPhone;
+    if (contactEmail) sitterFields.contactEmail = contactEmail;
+
+    // Build experienceAge object
+    sitterFields.experienceAges = {};
+    if (baby) sitterFields.experienceAges.baby = baby;
+    if (toddler) sitterFields.experienceAges.toddler = toddler;
+    if (preschooler) sitterFields.experienceAges.preschooler = preschooler;
+    if (gradeschooler)
+      sitterFields.experienceAges.gradeschooler = gradeschooler;
+    if (teenager) sitterFields.experienceAges.teenager = teenager;
+
+    // Build skills object
+    sitterFields.skills = {};
+    if (crafting) sitterFields.skills.crafting = crafting;
+    if (drawing) sitterFields.skills.drawing = drawing;
+    if (reading) sitterFields.skills.reading = reading;
+    if (music) sitterFields.skills.music = music;
+    if (language) sitterFields.skills.language = language;
+    if (games) sitterFields.skills.games = games;
+
+    // Build comfortableWith object
+    sitterFields.comfortableWith = {};
+    if (pets) sitterFields.comfortableWith.pets = pets;
+    if (cooking) sitterFields.comfortableWith.cooking = cooking;
+    if (chores) sitterFields.comfortableWith.chores = chores;
+
+    // Update geocoded location
+    const loc = await geocoder.geocode(address);
+    sitterFields.location = {
+      type: 'Point',
+      coordinates: [loc[0].longitude, loc[0].latitude],
+      formattedAddress: loc[0].formattedAddress,
+      street: loc[0].streetName,
+      city: loc[0].city,
+      state: loc[0].stateCode,
+      zipcode: loc[0].zipcode,
+      country: loc[0].countryCode,
+    };
+
+    try {
+      let sitter = await Sitter.findOne({ user: req.user.id });
+
+      sitter = await Sitter.findOneAndUpdate(
+        { user: req.user.id },
+        { $set: sitterFields },
+        { new: true, useFindAndModify: false },
+      );
+
+      return res.json(sitter);
+    } catch (err) {
+      console.error(err.message);
+      res.status(500).send('Server Error');
+    }
+  },
+);
+
 // @route   GET api/sitters
 // @desc    Get all sitters profiles
 // @access  Public

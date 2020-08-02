@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const { check, validationResult } = require('express-validator');
 const { protect, authorize } = require('../../middleware/auth');
+const geocoder = require('../../utils/geocoder');
 
 const Job = require('../../models/Job');
 
@@ -107,6 +108,96 @@ router.post(
 
       await job.save();
       res.json(job);
+    } catch (err) {
+      console.error(err.message);
+      res.status(500).send('Server Error');
+    }
+  },
+);
+
+// @route   PUT api/jobs/
+// @desc    Update babysitting job
+// @access  Private
+router.put(
+  '/:id',
+  [
+    [[protect, authorize('parent')]],
+    [
+      check('address', 'Address is required').not().isEmpty(),
+
+      check('description', 'Description is required').not().isEmpty(),
+      check('numberOfChildren', 'Number of children is required')
+        .not()
+        .isEmpty(),
+      check('ageOfChildren', 'Ages of children are required').not().isEmpty(),
+      check('hourlyRate', 'Hourly rate is required').not().isEmpty(),
+      check('contactPhone', 'Valid phone number is required').isMobilePhone(),
+      check('contactEmail', 'Valid email address is required').isEmail(),
+    ],
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const {
+      address,
+      numberOfChildren,
+      ageOfChildren,
+      description,
+      hourlyRate,
+      pets,
+      cooking,
+      chores,
+      contactPhone,
+      contactEmail,
+    } = req.body;
+
+    // Build job object
+    const jobFields = {};
+    jobFields.user = req.user.id;
+    if (address) jobFields.address = address;
+    if (numberOfChildren) jobFields.numberOfChildren = numberOfChildren;
+    if (ageOfChildren) {
+      jobFields.ageOfChildren = ageOfChildren
+        .split(',')
+        .map((child) => child.trim());
+    }
+    if (description) jobFields.description = description;
+    if (hourlyRate) jobFields.hourlyRate = hourlyRate;
+    if (contactPhone) jobFields.contactPhone = contactPhone;
+    if (contactEmail) jobFields.contactEmail = contactEmail;
+
+    // Build comfortableWith object
+    jobFields.comfortableWith = {};
+    if (pets) jobFields.comfortableWith.pets = pets;
+    if (cooking) jobFields.comfortableWith.cooking = cooking;
+    if (chores) jobFields.comfortableWith.chores = chores;
+
+    // Update geocoded location
+    const loc = await geocoder.geocode(address);
+    jobFields.location = {
+      type: 'Point',
+      coordinates: [loc[0].longitude, loc[0].latitude],
+      formattedAddress: loc[0].formattedAddress,
+      street: loc[0].streetName,
+      city: loc[0].city,
+      state: loc[0].stateCode,
+      zipcode: loc[0].zipcode,
+      country: loc[0].countryCode,
+    };
+
+    try {
+      let job = await Job.findOne({ user: req.user.id });
+
+      job = await Job.findOneAndUpdate(
+        { user: req.user.id },
+        { $set: jobFields },
+        { new: true, useFindAndModify: false },
+      );
+
+      return res.json(job);
     } catch (err) {
       console.error(err.message);
       res.status(500).send('Server Error');
