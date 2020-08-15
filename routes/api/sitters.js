@@ -269,12 +269,15 @@ router.put(
 router.get('/', async (req, res) => {
   try {
     let query;
+    let lat;
+    let lng;
+    let location = {};
 
     // Copy req.query
     const reqQuery = { ...req.query };
 
     // Fields to exclude
-    const removeFields = ['select', 'sort', 'page', 'limit'];
+    const removeFields = ['select', 'sort', 'page', 'limit', 'city', 'radius'];
 
     // Loop over removeFields and delete them from reqQuery
     removeFields.forEach((param) => delete reqQuery[param]);
@@ -288,11 +291,29 @@ router.get('/', async (req, res) => {
       (match) => `$${match}`,
     );
 
+    // Add location query with city and distance
+    if (req.query.city) {
+      const loc = await geocoder.geocode(req.query.city);
+      lat = loc[0].latitude;
+      lng = loc[0].longitude;
+
+      location = {
+        $geoWithin: {
+          $centerSphere: [[lng, lat], (req.query.radius || 10) / 6378],
+        },
+      };
+    }
+
+    // If location is provided add it to search query
+    const searchQuery = req.query.city
+      ? {
+          ...JSON.parse(queryStr),
+          location,
+        }
+      : JSON.parse(queryStr);
+
     // Finding resource
-    query = Sitter.find(JSON.parse(queryStr)).populate('user', [
-      'name',
-      'email',
-    ]);
+    query = Sitter.find(searchQuery).populate('user', ['name', 'email']);
 
     // Select Fields
     if (req.query.select) {

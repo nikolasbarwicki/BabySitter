@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const geocoder = require('../utils/geocoder');
+const moment = require('moment');
 
 const SitterSchema = new mongoose.Schema({
   user: {
@@ -28,6 +29,9 @@ const SitterSchema = new mongoose.Schema({
   dateOfBirth: {
     type: Date,
     required: true,
+  },
+  age: {
+    type: Number,
   },
   description: {
     type: String,
@@ -83,7 +87,7 @@ const SitterSchema = new mongoose.Schema({
   },
 });
 
-// Geocode & create location field
+// Geocode & create location field + calculate age
 SitterSchema.pre('save', async function (next) {
   const loc = await geocoder.geocode(this.address);
   this.location = {
@@ -96,6 +100,9 @@ SitterSchema.pre('save', async function (next) {
     zipcode: loc[0].zipcode,
     country: loc[0].countryCode,
   };
+
+  const calculateAge = moment().diff(this.dateOfBirth, 'years');
+  this.age = calculateAge;
 
   // Do not save address in DB
   this.address = undefined;

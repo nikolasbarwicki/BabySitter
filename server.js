@@ -1,6 +1,7 @@
 const express = require('express');
 const dotenv = require('dotenv');
 const connectDB = require('./config/db');
+const logger = require('./middleware/logger');
 
 const app = express();
 
@@ -14,6 +15,8 @@ connectDB();
 app.use(express.json({ extended: false }));
 
 app.get('/', (req, res) => res.send('API Running'));
+
+app.use(logger);
 
 // Define Routes
 app.use('/api/auth', require('./routes/api/auth'));
