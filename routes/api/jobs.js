@@ -38,12 +38,10 @@ router.post(
     [[protect, authorize('parent')]],
     [
       check('address', 'Address is required').not().isEmpty(),
-
       check('description', 'Description is required').not().isEmpty(),
       check('numberOfChildren', 'Number of children is required')
         .not()
         .isEmpty(),
-      check('ageOfChildren', 'Ages of children are required').not().isEmpty(),
       check('hourlyRate', 'Hourly rate is required').not().isEmpty(),
       check('contactPhone', 'Valid phone number is required').isMobilePhone(),
       check('contactEmail', 'Valid email address is required').isEmail(),
@@ -58,7 +56,11 @@ router.post(
     const {
       address,
       numberOfChildren,
-      ageOfChildren,
+      baby,
+      toddler,
+      preschooler,
+      gradeschooler,
+      teenager,
       description,
       hourlyRate,
       pets,
@@ -73,15 +75,18 @@ router.post(
     jobFields.user = req.user.id;
     if (address) jobFields.address = address;
     if (numberOfChildren) jobFields.numberOfChildren = numberOfChildren;
-    if (ageOfChildren) {
-      jobFields.ageOfChildren = ageOfChildren
-        .split(',')
-        .map((child) => child.trim());
-    }
     if (description) jobFields.description = description;
     if (hourlyRate) jobFields.hourlyRate = hourlyRate;
     if (contactPhone) jobFields.contactPhone = contactPhone;
     if (contactEmail) jobFields.contactEmail = contactEmail;
+
+    // Build ageOfChildren object
+    jobFields.ageOfChildren = {};
+    if (baby) jobFields.ageOfChildren.baby = baby;
+    if (toddler) jobFields.ageOfChildren.toddler = toddler;
+    if (preschooler) jobFields.ageOfChildren.preschooler = preschooler;
+    if (gradeschooler) jobFields.ageOfChildren.gradeschooler = gradeschooler;
+    if (teenager) jobFields.ageOfChildren.teenager = teenager;
 
     // Build comfortableWith object
     jobFields.comfortableWith = {};
@@ -129,7 +134,6 @@ router.put(
       check('numberOfChildren', 'Number of children is required')
         .not()
         .isEmpty(),
-      check('ageOfChildren', 'Ages of children are required').not().isEmpty(),
       check('hourlyRate', 'Hourly rate is required').not().isEmpty(),
       check('contactPhone', 'Valid phone number is required').isMobilePhone(),
       check('contactEmail', 'Valid email address is required').isEmail(),
@@ -144,7 +148,11 @@ router.put(
     const {
       address,
       numberOfChildren,
-      ageOfChildren,
+      baby,
+      toddler,
+      preschooler,
+      gradeschooler,
+      teenager,
       description,
       hourlyRate,
       pets,
@@ -159,15 +167,18 @@ router.put(
     jobFields.user = req.user.id;
     if (address) jobFields.address = address;
     if (numberOfChildren) jobFields.numberOfChildren = numberOfChildren;
-    if (ageOfChildren) {
-      jobFields.ageOfChildren = ageOfChildren
-        .split(',')
-        .map((child) => child.trim());
-    }
     if (description) jobFields.description = description;
     if (hourlyRate) jobFields.hourlyRate = hourlyRate;
     if (contactPhone) jobFields.contactPhone = contactPhone;
     if (contactEmail) jobFields.contactEmail = contactEmail;
+
+    // Build ageOfChildren object
+    jobFields.ageOfChildren = {};
+    if (baby) jobFields.ageOfChildren.baby = baby;
+    if (toddler) jobFields.ageOfChildren.toddler = toddler;
+    if (preschooler) jobFields.ageOfChildren.preschooler = preschooler;
+    if (gradeschooler) jobFields.ageOfChildren.gradeschooler = gradeschooler;
+    if (teenager) jobFields.ageOfChildren.teenager = teenager;
 
     // Build comfortableWith object
     jobFields.comfortableWith = {};
@@ -211,12 +222,15 @@ router.put(
 router.get('/', async (req, res) => {
   try {
     let query;
+    let lat;
+    let lng;
+    let location = {};
 
     // Copy req.query
     const reqQuery = { ...req.query };
 
     // Fields to exclude
-    const removeFields = ['select', 'sort', 'page', 'limit'];
+    const removeFields = ['select', 'sort', 'page', 'limit', 'city', 'radius'];
 
     // Loop over removeFields and delete them from reqQuery
     removeFields.forEach((param) => delete reqQuery[param]);
@@ -230,8 +244,29 @@ router.get('/', async (req, res) => {
       (match) => `$${match}`,
     );
 
+    // Add location query with city and distance
+    if (req.query.city) {
+      const loc = await geocoder.geocode(req.query.city);
+      lat = loc[0].latitude;
+      lng = loc[0].longitude;
+
+      location = {
+        $geoWithin: {
+          $centerSphere: [[lng, lat], (req.query.radius || 10) / 6378],
+        },
+      };
+    }
+
+    // If location is provided add it to search query
+    const searchQuery = req.query.city
+      ? {
+          ...JSON.parse(queryStr),
+          location,
+        }
+      : JSON.parse(queryStr);
+
     // Finding resource
-    query = Job.find(JSON.parse(queryStr)).populate('user', ['name', 'email']);
+    query = Job.find(searchQuery).populate('user', ['name', 'email']);
 
     // Select Fields
     if (req.query.select) {

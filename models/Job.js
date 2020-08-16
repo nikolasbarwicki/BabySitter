@@ -34,8 +34,11 @@ const JobSchema = new mongoose.Schema({
     required: true,
   },
   ageOfChildren: {
-    type: [Number],
-    required: true,
+    baby: { type: Boolean, default: false },
+    toddler: { type: Boolean, default: false },
+    preschooler: { type: Boolean, default: false },
+    gradeschooler: { type: Boolean, default: false },
+    teenager: { type: Boolean, default: false },
   },
   hourlyRate: {
     type: Number,
